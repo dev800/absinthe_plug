@@ -123,7 +123,8 @@ defmodule Absinthe.PlugTest do
     |> plug_parser
     |> Absinthe.Plug.call(opts)
 
-    assert resp_body == "Can only perform a mutation from a POST request"
+    message = "Can only perform a mutation from a POST request"
+    assert %{"errors" => [%{"message" => ^message}]} = resp_body |> Poison.decode!
   end
 
   @query """
@@ -142,7 +143,8 @@ defmodule Absinthe.PlugTest do
     |> plug_parser
     |> Absinthe.Plug.call(opts)
 
-    assert resp_body == opts[:no_query_message]
+    message = opts[:no_query_message]
+    assert %{"errors" => [%{"message" => ^message}]} = resp_body |> Poison.decode!
   end
 
   test "document with error returns validation errors" do
@@ -171,6 +173,27 @@ defmodule Absinthe.PlugTest do
     |> Absinthe.Plug.call(opts)
 
     assert %{"errors" => [%{"message" => "Field complex is too complex" <> _} | _]} = resp_body |> Poison.decode!
+  end
+
+  @query """
+  {
+    item(id: "foo") {
+      name
+    }
+  }
+  """
+  test "Handle an accidentally double encoded JSON body" do
+    opts = Absinthe.Plug.init(schema: TestSchema)
+
+    double_encoded_query =
+    %{query: @query}
+    |> Poison.encode!()
+    |> Poison.encode!()
+
+    assert %{status: 400} = conn(:post, "/", double_encoded_query)
+    |> put_req_header("content-type", "application/json")
+    |> plug_parser
+    |> Absinthe.Plug.call(opts)
   end
 
   @fragment_query """
@@ -314,6 +337,23 @@ defmodule Absinthe.PlugTest do
       |> call(opts)
 
       assert resp_body == %{"errors" => [%{"locations" => [%{"column" => 0, "line" => 1}], "message" => "Argument \"fileA\" has invalid value \"a\"."}]}
+    end
+
+    test "file upload works with null input", %{opts: opts} do
+      query = """
+      {uploadTest(fileB: null, fileA: "a")}
+      """
+
+      upload = %Plug.Upload{}
+
+      assert %{status: 200, resp_body: resp_body} = conn(:post, "/", %{
+        "query" => query,
+        "a" => upload
+      })
+      |> put_req_header("content-type", "multipart/form-data")
+      |> call(opts)
+
+      assert resp_body == %{"data" => %{"uploadTest" => "file_a, file_b"}}
     end
   end
 

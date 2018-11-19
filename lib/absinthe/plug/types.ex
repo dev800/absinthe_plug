@@ -59,15 +59,19 @@ defmodule Absinthe.Plug.Types do
   Represents an uploaded file.
   """
   scalar :upload do
-    parse fn
+    parse(fn
       %Blueprint.Input.String{value: value}, context ->
-        Map.fetch(context.__absinthe_plug__[:uploads] || %{}, value)
+        Map.fetch(context[:__absinthe_plug__][:uploads] || %{}, value)
+
+      %Blueprint.Input.Null{}, _ ->
+        {:ok, nil}
+
       _, _ ->
         :error
-    end
+    end)
 
-    serialize fn _ ->
+    serialize(fn _ ->
       raise "The `:upload` scalar cannot be returned!"
-    end
+    end)
   end
 end
