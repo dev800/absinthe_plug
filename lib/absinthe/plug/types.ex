@@ -61,7 +61,10 @@ defmodule Absinthe.Plug.Types do
   scalar :upload do
     parse(fn
       %Blueprint.Input.String{value: value}, context ->
-        Map.fetch(context[:__absinthe_plug__][:uploads] || %{}, value)
+        context
+        |> Map.get(:__absinthe_plug__, %{})
+        |> Map.get(:uploads, %{})
+        |> Map.fetch(value)
 
       %Blueprint.Input.Null{}, _ ->
         {:ok, nil}
